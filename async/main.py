@@ -53,6 +53,7 @@ def build_routes():
     server.add_route("get", "/", home)
     server.add_route("get", "/callback", callback)
     server.add_route("get", "/update", update)
+    server.add_route("get", "/dashboard", dashboard)
     server.add_route("post", "/profile_update", profile_update)
     server.add_route("get", "/profile", profile)
 
@@ -82,14 +83,12 @@ def callback(request, response):
     user_url = "https://{0}/userinfo?access_token={1}".format(
         env["AUTH0_DOMAIN"], token_info['access_token'])
     user_info = requests.get(user_url).json()
-    print(user_info)
     user_id = user_info["identities"][0]["user_id"]
     content = {"user_id": user_id}
     server.add_session(request, content)
     get_query = "select count(*) from profile where id=(?)"
     c.execute(get_query, (user_id,))
     (no_rows,) = c.fetchone()
-    print("welcome here")
     if not no_rows:
         query = "insert into profile (id) values (?)"
         c.execute(query, (user_id,))
@@ -113,7 +112,7 @@ def profile(request, response):
                 with open("./views/profile.html", "r") as f:
                     data = f.read()
                 print("data")
-                data = data.format(fname=res[0][1], lname=res[0][2], email=res[0][3], address=res[0][4], hometown=res[0][5], date_of_joining=res[0][7])
+                data = data.format(id=res[0][0],fname=res[0][1], lname=res[0][2], email=res[0][3], address=res[0][4], hometown=res[0][5],date_of_birth=res[0][6], date_of_joining=res[0][7])
                 print("welcome")
                 return server.send_html_handler(request, response, data)
         data += "Welcome to Profile app<br/>"
@@ -124,9 +123,25 @@ def profile(request, response):
 
 
 def update(request, response):
-    with open("./views/update.html", "r") as f:
-        data = f.read()
-    return server.send_html_handler(request, response, data)
+    session_data = server.get_session(request)
+    if session_data and "user_id" in session_data:
+        with open("./views/update.html", "r") as f:
+            data = f.read()
+        return server.send_html_handler(request, response, data)
+    return home(request,response)
+
+
+def dashboard(request,response):
+    session_data = server.get_session(request)
+    if session_data and "user_id" in session_data:
+        data = ""
+        c.execute("select * from profile")
+        rows = c.fetchall()
+        for row in rows:
+            data += "Name: <a href='/profile?id={0}'>{1}{2}</a>".format(row[0], row[1], row[2])
+            data += "<br/>"
+        return server.send_html_handler(request, response, data)
+    return home(request, response)
 
 
 def profile_update(request, response):
@@ -173,4 +188,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+main()
